@@ -8,7 +8,7 @@ The default feed list is based on my own research interests.
 ## Dependencies:
 
 ```
--- Python 2.7
+-- Python 3.x
 -- feedparser: https://github.com/kurtmckee/feedparser
 -- scikit-learn: http://scikit-learn.org
 ```

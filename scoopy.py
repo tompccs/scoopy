@@ -48,11 +48,11 @@ def interactive_trainer(stdscr, feeds):
     
     for feed_url in feeds:
         stdscr.clear()
-        title_pos = (curses.COLS-len(TRAINER_TITLE))/2
+        title_pos = (curses.COLS-len(TRAINER_TITLE))//2
         stdscr.addstr(0,title_pos if title_pos >= 0 else 0,TRAINER_TITLE,
                       curses.A_STANDOUT)
-        stdscr.addstr(curses.LINES/2,curses.COLS/2,"Loading feed...")
-        stdscr.addstr(curses.LINES/2+1,2,"Fetching feed from URL: {}".format(feed_url))
+        stdscr.addstr(curses.LINES//2,curses.COLS//2,"Loading feed...")
+        stdscr.addstr(curses.LINES//2+1,2,"Fetching feed from URL: {}".format(feed_url))
         stdscr.refresh()
 
         feed = feedparser.parse(feed_url)
@@ -61,23 +61,24 @@ def interactive_trainer(stdscr, feeds):
             if ftitle == None:
                 raise KeyError
             else:
-                for entry_num in xrange(len(feed.entries)):
+                for entry_num in range(len(feed.entries)):
                     stdscr.clear()
 
                     entry = feed.entries[entry_num]
                     
-                    title_pos = (curses.COLS-len(TRAINER_TITLE))/2
+                    title_pos = (curses.COLS-len(TRAINER_TITLE))//2
                     stdscr.addstr(0,title_pos if title_pos >= 0 else 0,TRAINER_TITLE,
                                   curses.A_STANDOUT)
                     stdscr.addstr(2,2," -- {}".format(ftitle.encode('ascii', 'xmlcharrefreplace')))
                     stdscr.addstr(3,2," -- Article {} of {}".format(entry_num,len(feed.entries)))
-                    stdscr.addstr(4,2,"'{}'".format(entry.title.encode('ascii', 'xmlcharrefreplace')))
+                    stdscr.addstr(4,2,"'{}'".format(entry.title.encode('ascii',
+                                                                       'xmlcharrefreplace')))
 
                     # print as much of the abstract as we have room for on the terminal
                     numlines = curses.LINES - 10
                     abstract_words = entry.description.split(" ")
                     word_index = 0
-                    for row in xrange(numlines):
+                    for row in range(numlines):
                         currentline = ""
                         while word_index < len(abstract_words) and \
                               len(currentline + abstract_words[word_index]) < curses.COLS - 2:
@@ -114,9 +115,9 @@ def load_akregator_feeds(filename):
     return urls
 
 def main(args):
-    print "Scoopy is a command-line utility to help you keep up with"
-    print "research relevant to you"
-    print
+    print("Scoopy is a command-line utility to help you keep up with")
+    print("research relevant to you")
+    print()
 
 
 if __name__ == '__main__':
