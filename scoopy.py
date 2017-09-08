@@ -7,7 +7,9 @@ from math import floor, ceil
 import curses
 import re
 import feedparser
+import sklearn
 
+from sklearn.externals import joblib
 
 TRAINER_TITLE = "==== SCOOPY Interactive Trainer ===="
 
@@ -39,9 +41,12 @@ DEFAULT_FEEDS = ('http://feeds.nature.com/nphoton/rss/current',
  'http://onlinelibrary.wiley.com/rss/journal/10.1002/(ISSN)1521-4095')
 
 DEFAULT_BROWSER = "firefox"
+DATASET_LOCATION = "data.pkl"
 
+KEY_RELEVANT = 1
+KEY_IRRELEVANT = 2
 
-def interactive_trainer(stdscr, feeds):
+def interactive_trainer(stdscr, feeds=DEFAULT_FEEDS, dataset=[]):
     stdscr.clear()
 
     stdscr.addstr(0,0,"Loading...")
@@ -61,10 +66,15 @@ def interactive_trainer(stdscr, feeds):
             if ftitle == None:
                 raise KeyError
             else:
+                look_at_previous_item = False
+                advancing_to_next_feed = False
                 for entry_num in range(len(feed.entries)):
                     stdscr.clear()
 
-                    entry = feed.entries[entry_num]
+                    if advancing_to_next_feed:
+                        break
+                    
+                    entry = feed.entries[entry_num if not look_at_previous_item else entry_num - 1]
                     
                     title_pos = (curses.COLS-len(TRAINER_TITLE))//2
                     stdscr.addstr(0,title_pos if title_pos >= 0 else 0,TRAINER_TITLE,
@@ -88,19 +98,71 @@ def interactive_trainer(stdscr, feeds):
                     if word_index < len(abstract_words) - 1 and row >= numlines - 1:
                         stdscr.addstr(row + 9,0,"[truncated]")
 
+                    stdscr.addstr(curses.LINES - 2, 0,
+                                  "PRESS: 'j' -> RELEVANT; 'o' -> NOT RELEVANT; " + \
+                                  "'[space]' -> READ; 'q' -> QUIT")
                     stdscr.addstr(curses.LINES - 1, 0,
-                                  "PRESS: 'p' -> RELEVANT; 'k' -> NOT RELEVANT; '[space]' -> READ")
-                    choice = stdscr.getkey()
-
-                    if choice == " ":
-                        call([DEFAULT_BROWSER, entry.link])
+                                  "       'i' -> IGNORE;   'f' -> NEXT JOURNAL; " + \
+                                  ("'u' -> UNDO;" if \
+                                  not look_at_previous_item and \
+                                   not entry_num == 0 else ""))
+                    
+                    advancing_to_next_item = False
+                    while not advancing_to_next_item:
+                        choice = stdscr.getkey()
+                        if choice == "j":
+                            dataset.append([entry.title, KEY_RELEVANT])
+                            advancing_to_next_item = True
+                            look_at_previous_item = False
+                        elif choice == "o":
+                            dataset.append([entry.title, KEY_IRRELEVANT])
+                            advancing_to_next_item = True
+                            look_at_previous_item = False
+                        elif choice == "i":
+                            advancing_to_next_item = True
+                            look_at_previous_item = False
+                        elif choice == " ":
+                            call([DEFAULT_BROWSER, entry.link])
+                        elif choice == "f":
+                            advancing_to_next_feed = True
+                            advancing_to_next_item = True
+                            look_at_previous_item = False
+                        elif choice == "u" and not look_at_previous_item and not entry_num == 0:
+                            if len(dataset) > 0: dataset.pop()
+                            look_at_previous_item = True
+                            advancing_to_next_item = True
+                        elif choice == "q":
+                            return dataset
         except KeyError:
             continue
     
 
-def start_interactive_trainer(feeds):
-    curses.wrapper(interactive_trainer, feeds)
-        
+def load_existing_dataset(location=DATASET_LOCATION):
+    try:
+        existing_file = open(DATASET_LOCATION, 'rb')
+        dataset = joblib.load(existing_file)
+        existing_file.close()
+    except FileNotFoundError as e:
+        dataset = []
+    return dataset
+
+def save_dataset(dataset, location=DATASET_LOCATION):
+    if dataset != None and len(dataset) > 0:
+        joblib.dump(dataset, location, compress=True)
+    
+def start_interactive_trainer(feeds=DEFAULT_FEEDS, ds_location=DATASET_LOCATION):
+    # This function builds a training set
+    dataset = []
+    curses.wrapper(interactive_trainer, feeds, dataset)
+
+    # Load an existing dataset, if it exists, and append the new additions
+    existing_dataset = load_existing_dataset(ds_location)
+
+    for entry in existing_dataset:
+        dataset.append(entry)
+    
+    save_dataset(dataset, ds_location) 
+
 def load_akregator_feeds(filename):
     fin = open(filename, 'r')
 
