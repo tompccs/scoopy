@@ -3,6 +3,9 @@
 from sys import argv
 from subprocess import call
 from math import floor, ceil
+from random import shuffle
+
+from numpy import array
 
 import curses
 import re
@@ -10,6 +13,9 @@ import feedparser
 import sklearn
 
 from sklearn.externals import joblib
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.linear_model import SGDClassifier
 
 TRAINER_TITLE = "==== SCOOPY Interactive Trainer ===="
 
@@ -42,6 +48,8 @@ DEFAULT_FEEDS = ('http://feeds.nature.com/nphoton/rss/current',
 
 DEFAULT_BROWSER = "firefox"
 DATASET_LOCATION = "data.pkl"
+
+DEFAULT_MODEL_PARAMS = {'loss': 'hinge', 'alpha': 1e-3, 'random_state': 42, 'n_iter': 5}
 
 KEY_RELEVANT = 1
 KEY_IRRELEVANT = 2
@@ -163,6 +171,65 @@ def start_interactive_trainer(feeds=DEFAULT_FEEDS, ds_location=DATASET_LOCATION)
     
     save_dataset(dataset, ds_location) 
 
+def get_default_model_pipeline(params=DEFAULT_MODEL_PARAMS):
+    pipeline = Pipeline([('vect', CountVectorizer()),
+                         ('tfidf', TfidfTransformer()),
+                         ('clf', SGDClassifier(**params))])
+    return pipeline
+
+def build_default_model(ds_location=DATASET_LOCATION, params=DEFAULT_MODEL_PARAMS, test=False):
+    model = get_default_model_pipeline(params)
+    raw_dataset = load_existing_dataset(ds_location)
+
+    # transform the dataset into a numpy array with the first (slow) index referring to the 
+    # category and the second index referring to the item
+    dataset = []
+    if test:
+        shuffle(raw_dataset)
+        dataset = array(raw_dataset[:len(raw_dataset)//2])
+    else:
+        dataset = array(raw_dataset)
+    dataset = dataset.T
+
+    # build the model
+    model.fit(dataset[0], dataset[1])
+
+    if test:
+        # if this is a test, return a tuple containing the model trained on half the dataset and
+        # the other half of the dataset for comparison
+        return (model, array(raw_dataset[len(dataset)//2+1:]).T)
+    else:
+        return model
+                
+def test_model(ds_location=DATASET_LOCATION, params=DEFAULT_MODEL_PARAMS):
+    model, testset = build_default_model(ds_location=ds_location, params=params, test=True)
+    prediction = model.predict(testset[0])
+
+    num_correct = 0
+    num_falsen = 0
+    num_falsep = 0
+    total = len(prediction)
+    
+    for i in range(total):
+        if prediction[i] == '1' and testset[1][i] == '1':
+            print("CORRECT:    " + testset[0][i])
+            num_correct += 1
+        elif prediction[i] == '1' and testset[1][i] == '2':
+            print("FALSE +VE:  " + testset[0][i])
+            num_falsep += 1
+        elif prediction[i] == '2' and testset[1][i] == '1':
+            print("FALSE -VE:  " + testset[0][i])
+            num_falsen += 1
+        else:
+            num_correct += 1
+
+    print("-------")
+    print("-STATS-")
+    print("correct   = {}%".format(num_correct/total*100.))
+    print("false +ve = {}%".format(num_falsep/total*100.))
+    print("false -ve = {}%".format(num_falsen/total*100.))
+    print()
+    
 def load_akregator_feeds(filename):
     fin = open(filename, 'r')
 
