@@ -16,7 +16,7 @@ The default feed list is based on my own research interests.
 ## Current usage
 ```
 >> from scoopy import start_interactive_trainer, test_model
->> start_intereactive_trainer()
+>> start_interactive_trainer()
 # You will be taken to the interactive trainer. To exit, press 'q'.
 
 >> test_model()
